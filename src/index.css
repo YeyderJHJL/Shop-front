@@ -1,0 +1,43 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', 'Roboto', system-ui, 'Segoe UI', sans-serif;
+
+  /* Material 3 palette from the original Android app */
+  --color-primary: #6650a4;
+  --color-primary-dark: #574492;
+  --color-secondary: #625b71;
+  --color-tertiary: #7d5260;
+
+  --color-surface: #fffbfe;
+  --color-surface-variant: #e7e0ec;
+  --color-on-surface: #1c1b1f;
+  --color-on-surface-variant: #49454f;
+  --color-outline: #cac4d0;
+
+  --color-error: #b3261e;
+  --color-error-container: #f9dedc;
+  --color-success: #2e7d32;
+  --color-success-container: #e6f4ea;
+
+  --radius-md3: 12px;
+  --radius-md3-lg: 16px;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    margin: 0;
+    background-color: #f5f2f9;
+    color: var(--color-on-surface);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  #root {
+    min-height: 100svh;
+  }
+}
