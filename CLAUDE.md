@@ -9,17 +9,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Cliente** — the shopping app under `Layout` (`/`, `/product/:id`, `/cart`, `/checkout`, `/profile`, plus `/login` and `/register`).
 - **Administrador** — the management panel under `AdminLayout`, guarded by `RequireAdmin` (role `admin` only): `/admin` (dashboard), `/admin/productos`, `/admin/usuarios`, `/admin/ofertas`, `/admin/pedidos`.
 
-There is no backend yet. All data is mock/seed and mutated client-side.
+This frontend consumes the **Shop-back** REST API (Express + Prisma + PostgreSQL). All CRUD, auth, orders and dashboard metrics go through it — there is no more mock data.
 
 ### Architecture
 
+- **`src/lib/api.ts`** is the single gateway to the backend. It holds the JWT (`localStorage` key `shop-token`), attaches `Authorization: Bearer`, and maps between backend DTOs and the frontend types — including the enum translations: order status `PENDING/PREPARING/COMPLETED/CANCELLED` ↔ `pendiente/preparando/entregado/cancelado`, role `ADMIN/CLIENT` ↔ `admin/cliente`, user status `ACTIVE/INACTIVE` ↔ `activo/inactivo`. Base URL comes from `VITE_API_URL`. The repo ships `.env` / `.env.production` pointing at the **deployed API** (`https://shop-back-o6wo.onrender.com/api`); the in-code default is `http://localhost:3000/api` for local backend work. **All entity IDs are strings (UUIDs)**, not numbers.
 - **State** lives in React contexts under `src/context/`:
-  - `DataContext` — shared store for `products`, `users`, `orders`, `offers` with CRUD, seeded from `src/data/*.ts` and persisted to `localStorage` (`shop-admin-data`). Both the client app and the admin panel read/write through `useData()`.
-  - `AuthContext` — `useAuth()` resolves a user's role by matching their email against `src/data/users.ts`; `isAdmin` and `login()` (returns the resolved user) drive role-based redirects. Demo accounts: `admin@shop.com` (admin), `jturpoan@unsa.edu.pe` (cliente); any password.
-  - `CartContext` — client shopping cart.
-- **Types** in `src/types.ts`: `Product` (with `originalPrice`, `stock`, `expiryDate`), `User` (`role`, `status`), `Order`/`OrderItem`, `Offer`.
-- **Admin UI** in `src/components/admin/` (`AdminLayout`, `RequireAdmin`, `Modal`, `FormField`) and `src/pages/admin/`.
-- Provider nesting (`src/main.tsx`): `DataProvider > AuthProvider > CartProvider`.
+  - `AuthContext` — `useAuth()`; async `login(email, password)` / `register(name, email, password)` hit the API, persist the token + user, and rehydrate on reload. `isAdmin` drives role-based redirects.
+  - `DataContext` — `useData()`; API-backed store for `products`, `users`, `orders`, `offers`. Loads the public catalog (products, offers) always, and users + orders only when an admin is authenticated. Its CRUD methods are **async** (call the API then refetch).
+  - `CartContext` — client shopping cart; `Checkout` turns the cart into a real `POST /orders`.
+- **Types** in `src/types.ts`: `Product` (`price`, `originalPrice`, `category`, `stock`, `expiryDate`), `User` (`role`, `status`), `Order`/`OrderItem`, `Offer`.
+- **Admin UI** in `src/components/admin/` and `src/pages/admin/`. `AdminDashboard` fetches `GET /dashboard/metrics` (sales, orders-by-status, top products, users, sales-by-date).
+- Provider nesting (`src/main.tsx`): `AuthProvider > DataProvider > CartProvider` — Auth is outermost so Data can react to login state.
+- Demo accounts on the deployed DB: `admin@shop.com` / `admin123` (admin), `cliente@feliz.com` / `cliente123` (cliente). Login/register hit the live Render API, so no local backend is needed (the free Render instance may cold-start for a few seconds on the first request).
 
 ## Commands
 

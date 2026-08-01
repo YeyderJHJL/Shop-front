@@ -10,11 +10,21 @@ export default function Register() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    register(name, email)
-    navigate('/profile')
+    setError('')
+    setSubmitting(true)
+    try {
+      await register(name, email, password)
+      navigate('/profile')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo crear la cuenta')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -82,11 +92,18 @@ export default function Register() {
           </div>
         </label>
 
+        {error && (
+          <p className="rounded-xl bg-error-container px-4 py-3 text-sm font-medium text-error">
+            {error}
+          </p>
+        )}
+
         <button
           type="submit"
-          className="w-full rounded-xl bg-primary px-6 py-3.5 font-semibold text-white shadow-md transition-colors hover:bg-primary-dark"
+          disabled={submitting}
+          className="w-full rounded-xl bg-primary px-6 py-3.5 font-semibold text-white shadow-md transition-colors hover:bg-primary-dark disabled:opacity-60"
         >
-          Crear Cuenta
+          {submitting ? 'Creando...' : 'Crear Cuenta'}
         </button>
       </form>
 

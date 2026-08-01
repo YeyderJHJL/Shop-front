@@ -9,11 +9,21 @@ export default function Login() {
   const navigate = useNavigate()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    const account = login(email)
-    navigate(account.role === 'admin' ? '/admin' : '/profile')
+    setError('')
+    setSubmitting(true)
+    try {
+      const account = await login(email, password)
+      navigate(account.role === 'admin' ? '/admin' : '/profile')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo iniciar sesión')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -64,23 +74,32 @@ export default function Login() {
           </div>
         </label>
 
+        {error && (
+          <p className="rounded-xl bg-error-container px-4 py-3 text-sm font-medium text-error">
+            {error}
+          </p>
+        )}
+
         <button
           type="submit"
-          className="w-full rounded-xl bg-primary px-6 py-3.5 font-semibold text-white shadow-md transition-colors hover:bg-primary-dark"
+          disabled={submitting}
+          className="w-full rounded-xl bg-primary px-6 py-3.5 font-semibold text-white shadow-md transition-colors hover:bg-primary-dark disabled:opacity-60"
         >
-          Iniciar Sesión
+          {submitting ? 'Ingresando...' : 'Iniciar Sesión'}
         </button>
       </form>
 
       <div className="mt-6 rounded-2xl border border-outline/60 bg-surface-variant/50 px-4 py-3 text-center text-sm text-on-surface-variant">
         <p className="font-medium text-on-surface">Cuentas de demostración</p>
         <p>
-          Administrador: <span className="font-mono">admin@shop.com</span>
+          Administrador: <span className="font-mono">admin@shop.com</span> /{' '}
+          <span className="font-mono">admin123</span>
         </p>
         <p>
-          Cliente: <span className="font-mono">jturpoan@unsa.edu.pe</span>
+          Cliente: <span className="font-mono">cliente@feliz.com</span> /{' '}
+          <span className="font-mono">cliente123</span>
         </p>
-        <p className="mt-1 text-xs">Usa cualquier contraseña.</p>
+        <p className="mt-1 text-xs">Conectado a la API desplegada (Render).</p>
       </div>
 
       <p className="mt-6 text-center text-on-surface-variant">

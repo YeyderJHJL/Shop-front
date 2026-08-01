@@ -2,7 +2,7 @@ export type UserRole = 'cliente' | 'admin'
 export type UserStatus = 'activo' | 'inactivo'
 
 export interface Product {
-  id: number
+  id: string
   name: string
   /** Precio rebajado al que se ofrece el producto próximo a vencer. */
   price: number
@@ -22,7 +22,7 @@ export interface CartItem extends Product {
 }
 
 export interface User {
-  id: number
+  id: string
   name: string
   email: string
   role: UserRole
@@ -34,14 +34,14 @@ export interface User {
 export type OrderStatus = 'pendiente' | 'preparando' | 'entregado' | 'cancelado'
 
 export interface OrderItem {
-  productId: number
+  productId: string
   name: string
   price: number
   quantity: number
 }
 
 export interface Order {
-  id: number
+  id: string
   customerName: string
   customerEmail: string
   items: OrderItem[]
@@ -52,7 +52,7 @@ export interface Order {
 }
 
 export interface Offer {
-  id: number
+  id: string
   title: string
   description: string
   /** Porcentaje de descuento aplicado (0-100). */
@@ -60,6 +60,9 @@ export interface Offer {
   /** Categoría a la que aplica la oferta, o 'Todos'. */
   category: string
   active: boolean
+  /** Producto puntual al que se ata la oferta (opcional). */
+  productId?: string
+  productName?: string
   startDate: string
   endDate: string
 }

@@ -10,13 +10,13 @@ import { DataProvider } from './context/DataContext.tsx'
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
-      <DataProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <DataProvider>
           <CartProvider>
             <App />
           </CartProvider>
-        </AuthProvider>
-      </DataProvider>
+        </DataProvider>
+      </AuthProvider>
     </BrowserRouter>
   </StrictMode>,
 )

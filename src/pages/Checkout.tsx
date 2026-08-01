@@ -2,15 +2,20 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { CheckCircle, PartyPopper } from 'lucide-react'
 import { useCart } from '../context/CartContext.tsx'
+import { useAuth } from '../context/AuthContext.tsx'
 import { formatPrice } from '../lib/format.ts'
+import * as api from '../lib/api.ts'
 
 const FREE_SHIPPING_THRESHOLD = 500
 const SHIPPING_COST = 15
 
 export default function Checkout() {
   const { items, subtotal, clearCart } = useCart()
+  const { user } = useAuth()
   const navigate = useNavigate()
   const [confirmed, setConfirmed] = useState(false)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
   const freeShipping = subtotal >= FREE_SHIPPING_THRESHOLD
   const shipping = freeShipping ? 0 : SHIPPING_COST
@@ -53,9 +58,23 @@ export default function Checkout() {
     )
   }
 
-  function handleConfirm() {
-    clearCart()
-    setConfirmed(true)
+  async function handleConfirm() {
+    // Crear un pedido requiere sesión iniciada.
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    setError('')
+    setSubmitting(true)
+    try {
+      await api.createOrder(items.map((it) => ({ productId: it.id, quantity: it.quantity })))
+      clearCart()
+      setConfirmed(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo confirmar el pedido')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -116,13 +135,25 @@ export default function Checkout() {
         </div>
       </div>
 
+      {error && (
+        <p className="mt-4 rounded-xl bg-error-container px-4 py-3 text-sm font-medium text-error">
+          {error}
+        </p>
+      )}
+      {!user && (
+        <p className="mt-4 rounded-xl bg-surface-variant px-4 py-3 text-sm text-on-surface-variant">
+          Debes iniciar sesión para confirmar tu pedido.
+        </p>
+      )}
+
       <div className="mt-6 flex flex-col gap-3 sm:flex-row-reverse">
         <button
           type="button"
           onClick={handleConfirm}
-          className="flex-1 rounded-2xl bg-primary px-6 py-4 font-semibold text-white shadow-md transition-colors hover:bg-primary-dark"
+          disabled={submitting}
+          className="flex-1 rounded-2xl bg-primary px-6 py-4 font-semibold text-white shadow-md transition-colors hover:bg-primary-dark disabled:opacity-60"
         >
-          Confirmar Pedido
+          {submitting ? 'Confirmando...' : 'Confirmar Pedido'}
         </button>
         <button
           type="button"

@@ -1,72 +1,81 @@
-import { createContext, useContext, useMemo, useState } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { User } from '../types.ts'
-import { USERS } from '../data/users.ts'
+import * as api from '../lib/api.ts'
 
 interface AuthContextValue {
   user: User | null
-  /** Inicia sesión resolviendo el rol desde los usuarios semilla. Devuelve el usuario. */
-  login: (email: string) => User
-  register: (name: string, email: string) => User
+  /** Verdadero mientras se rehidrata la sesión guardada al cargar la app. */
+  loading: boolean
+  /** Inicia sesión contra el backend. Devuelve el usuario o lanza ApiError. */
+  login: (email: string, password: string) => Promise<User>
+  /** Registra un cliente y deja la sesión iniciada. */
+  register: (name: string, email: string, password: string) => Promise<User>
   logout: () => void
   isAdmin: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-function findByEmail(email: string): User | undefined {
-  const target = email.trim().toLowerCase()
-  return USERS.find((u) => u.email.toLowerCase() === target)
-}
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10)
-}
+const USER_KEY = 'shop-user'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // La app arranca sin sesión para poder demostrar el login de cliente y de admin.
   const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
 
-  function login(email: string): User {
-    const existing = findByEmail(email)
-    const resolved: User = existing ?? {
-      id: Date.now(),
-      name: email.split('@')[0] || 'Usuario',
-      email,
-      role: 'cliente',
-      status: 'activo',
-      joinedAt: todayISO(),
+  // Rehidratar la sesión desde localStorage si hay token + usuario guardados.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(USER_KEY)
+      if (raw && api.getToken()) setUser(JSON.parse(raw) as User)
+    } catch {
+      /* datos corruptos: se ignora */
     }
+    setLoading(false)
+  }, [])
+
+  function persist(u: User) {
+    try {
+      localStorage.setItem(USER_KEY, JSON.stringify(u))
+    } catch {
+      /* almacenamiento no disponible */
+    }
+  }
+
+  async function login(email: string, password: string): Promise<User> {
+    const { token, user: resolved } = await api.login(email, password)
+    api.setToken(token)
+    persist(resolved)
     setUser(resolved)
     return resolved
   }
 
-  function register(name: string, email: string): User {
-    const resolved: User = {
-      id: Date.now(),
-      name,
-      email,
-      role: 'cliente',
-      status: 'activo',
-      joinedAt: todayISO(),
-    }
-    setUser(resolved)
-    return resolved
+  async function register(name: string, email: string, password: string): Promise<User> {
+    await api.register(name, email, password)
+    // El registro no devuelve token: iniciamos sesión para obtenerlo.
+    return login(email, password)
   }
 
   function logout() {
+    api.clearToken()
+    try {
+      localStorage.removeItem(USER_KEY)
+    } catch {
+      /* ignore */
+    }
     setUser(null)
   }
 
   const value = useMemo<AuthContextValue>(
     () => ({
       user,
+      loading,
       login,
       register,
       logout,
       isAdmin: user?.role === 'admin',
     }),
-    [user],
+    [user, loading],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

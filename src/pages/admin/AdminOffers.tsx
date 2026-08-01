@@ -40,21 +40,34 @@ export default function AdminOffers() {
     setModalOpen(true)
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (editing) updateOffer(editing.id, form)
-    else addOffer(form)
-    setModalOpen(false)
+    try {
+      if (editing) await updateOffer(editing.id, form)
+      else await addOffer(form)
+      setModalOpen(false)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo guardar la oferta')
+    }
   }
 
-  function handleDelete(o: Offer) {
-    if (window.confirm(`¿Eliminar la oferta "${o.title}"?`)) deleteOffer(o.id)
+  async function handleDelete(o: Offer) {
+    if (!window.confirm(`¿Eliminar la oferta "${o.title}"?`)) return
+    try {
+      await deleteOffer(o.id)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo eliminar la oferta')
+    }
   }
 
-  function toggleActive(o: Offer) {
+  async function toggleActive(o: Offer) {
     const { id: _id, ...rest } = o
     void _id
-    updateOffer(o.id, { ...rest, active: !o.active })
+    try {
+      await updateOffer(o.id, { ...rest, active: !o.active })
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo actualizar la oferta')
+    }
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {

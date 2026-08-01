@@ -70,16 +70,24 @@ export default function AdminProducts() {
     setModalOpen(true)
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (editing) updateProduct(editing.id, form)
-    else addProduct(form)
-    setModalOpen(false)
+    try {
+      if (editing) await updateProduct(editing.id, form)
+      else await addProduct(form)
+      setModalOpen(false)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo guardar el producto')
+    }
   }
 
-  function handleDelete(p: Product) {
-    if (window.confirm(`¿Eliminar "${p.name}"? Esta acción no se puede deshacer.`))
-      deleteProduct(p.id)
+  async function handleDelete(p: Product) {
+    if (!window.confirm(`¿Eliminar "${p.name}"? Esta acción no se puede deshacer.`)) return
+    try {
+      await deleteProduct(p.id)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo eliminar el producto')
+    }
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {

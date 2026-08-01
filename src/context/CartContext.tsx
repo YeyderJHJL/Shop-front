@@ -7,8 +7,8 @@ interface CartContextValue {
   count: number
   subtotal: number
   addToCart: (product: Product, quantity?: number) => void
-  removeFromCart: (id: number) => void
-  updateQuantity: (id: number, quantity: number) => void
+  removeFromCart: (id: string) => void
+  updateQuantity: (id: string, quantity: number) => void
   clearCart: () => void
 }
 
@@ -31,11 +31,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
     })
   }
 
-  function removeFromCart(id: number) {
+  function removeFromCart(id: string) {
     setItems((prev) => prev.filter((item) => item.id !== id))
   }
 
-  function updateQuantity(id: number, quantity: number) {
+  function updateQuantity(id: string, quantity: number) {
     if (quantity < 1) return
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, quantity } : item)),

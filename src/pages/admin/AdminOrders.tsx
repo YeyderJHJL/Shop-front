@@ -24,6 +24,14 @@ export default function AdminOrders() {
   const [filter, setFilter] = useState<OrderStatus | 'todos'>('todos')
   const [detail, setDetail] = useState<Order | null>(null)
 
+  async function changeStatus(id: string, status: OrderStatus) {
+    try {
+      await updateOrderStatus(id, status)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo cambiar el estado')
+    }
+  }
+
   const filtered = useMemo(
     () =>
       filter === 'todos'
@@ -73,7 +81,7 @@ export default function AdminOrders() {
           <tbody>
             {filtered.map((o) => (
               <tr key={o.id} className="border-b border-outline/40 last:border-0">
-                <td className="px-4 py-3 font-mono text-on-surface">#{o.id}</td>
+                <td className="px-4 py-3 font-mono text-on-surface">#{o.id.slice(0, 8)}</td>
                 <td className="px-4 py-3">
                   <p className="font-medium text-on-surface">{o.customerName}</p>
                   <p className="text-xs text-on-surface-variant">{o.customerEmail}</p>
@@ -87,9 +95,7 @@ export default function AdminOrders() {
                 <td className="px-4 py-3">
                   <select
                     value={o.status}
-                    onChange={(e) =>
-                      updateOrderStatus(o.id, e.target.value as OrderStatus)
-                    }
+                    onChange={(e) => changeStatus(o.id, e.target.value as OrderStatus)}
                     className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize outline-none ${STATUS_STYLES[o.status]}`}
                   >
                     {STATUSES.map((s) => (
@@ -127,7 +133,7 @@ export default function AdminOrders() {
       <Modal
         open={detail !== null}
         onClose={() => setDetail(null)}
-        title={detail ? `Pedido #${detail.id}` : 'Pedido'}
+        title={detail ? `Pedido #${detail.id.slice(0, 8)}` : 'Pedido'}
       >
         {detail && (
           <div className="space-y-4">

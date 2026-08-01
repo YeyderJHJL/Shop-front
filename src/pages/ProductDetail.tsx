@@ -15,7 +15,7 @@ export default function ProductDetail() {
   const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
 
-  const product = products.find((p) => p.id === Number(id))
+  const product = products.find((p) => p.id === id)
 
   if (!product) {
     return (

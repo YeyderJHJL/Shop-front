@@ -23,6 +23,7 @@ export default function AdminUsers() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<User | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY)
+  const [password, setPassword] = useState('')
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -36,6 +37,7 @@ export default function AdminUsers() {
   function openCreate() {
     setEditing(null)
     setForm(EMPTY)
+    setPassword('')
     setModalOpen(true)
   }
 
@@ -44,18 +46,28 @@ export default function AdminUsers() {
     const { id: _id, ...rest } = u
     void _id
     setForm(rest)
+    setPassword('')
     setModalOpen(true)
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    if (editing) updateUser(editing.id, form)
-    else addUser(form)
-    setModalOpen(false)
+    try {
+      if (editing) await updateUser(editing.id, form)
+      else await addUser(form, password)
+      setModalOpen(false)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo guardar el usuario')
+    }
   }
 
-  function handleDelete(u: User) {
-    if (window.confirm(`¿Eliminar la cuenta de "${u.name}"?`)) deleteUser(u.id)
+  async function handleDelete(u: User) {
+    if (!window.confirm(`¿Eliminar la cuenta de "${u.name}"?`)) return
+    try {
+      await deleteUser(u.id)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'No se pudo eliminar el usuario')
+    }
   }
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
@@ -190,6 +202,19 @@ export default function AdminUsers() {
               className={inputCls}
             />
           </Field>
+          {!editing && (
+            <Field label="Contraseña">
+              <input
+                required
+                type="password"
+                minLength={6}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Mínimo 6 caracteres"
+                className={inputCls}
+              />
+            </Field>
+          )}
           <div className="grid grid-cols-2 gap-4">
             <Field label="Rol">
               <select
