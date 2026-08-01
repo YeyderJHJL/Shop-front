@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
   AlertTriangle,
   BarChart3,
@@ -9,64 +9,122 @@ import {
   Users,
 } from 'lucide-react'
 import { formatPrice, formatDate, daysUntil } from '../../lib/format.ts'
-import * as api from '../../lib/api.ts'
-import type { DashboardStats } from '../../lib/api.ts'
+import { useData } from '../../context/DataContext.tsx'
+import type { Order, OrderStatus } from '../../types.ts'
 
-// Etiquetas y colores de cada estado de pedido (claves del backend).
-const STATUS_META: { key: string; label: string; bar: string; text: string }[] = [
-  { key: 'PENDING', label: 'Pendientes', bar: 'bg-tertiary', text: 'text-tertiary' },
-  { key: 'PREPARING', label: 'Preparando', bar: 'bg-primary', text: 'text-primary' },
-  { key: 'COMPLETED', label: 'Entregados', bar: 'bg-success', text: 'text-success' },
-  { key: 'CANCELLED', label: 'Cancelados', bar: 'bg-error', text: 'text-error' },
+// Etiquetas y colores de cada estado de pedido.
+const STATUS_META: { key: OrderStatus; label: string; bar: string; text: string }[] = [
+  { key: 'pendiente', label: 'Pendientes', bar: 'bg-tertiary', text: 'text-tertiary' },
+  { key: 'preparando', label: 'Preparando', bar: 'bg-primary', text: 'text-primary' },
+  { key: 'entregado', label: 'Entregados', bar: 'bg-success', text: 'text-success' },
+  { key: 'cancelado', label: 'Cancelados', bar: 'bg-error', text: 'text-error' },
 ]
 
-export default function AdminDashboard() {
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(true)
-  const [reloadKey, setReloadKey] = useState(0)
-
-  useEffect(() => {
-    let active = true
-    setLoading(true)
-    setError('')
-    api
-      .getDashboardStats()
-      .then((s) => active && setStats(s))
-      .catch((e) => active && setError(e instanceof Error ? e.message : 'Error cargando métricas'))
-      .finally(() => {
-        if (active) setLoading(false)
-      })
-    return () => {
-      active = false
-    }
-  }, [reloadKey])
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center gap-2 py-24 text-on-surface-variant">
-        <RefreshCw className="h-5 w-5 animate-spin" /> Cargando métricas...
-      </div>
+/** Últimas 14 fechas (yyyy-mm-dd) terminando hoy, en orden cronológico. */
+function lastFourteenDays(): string[] {
+  const days: string[] = []
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(today.getDate() - i)
+    days.push(
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
     )
   }
+  return days
+}
 
-  if (error || !stats) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-4 py-24 text-center">
-        <AlertTriangle className="h-12 w-12 text-error" />
-        <div>
-          <p className="text-lg font-semibold">No se pudieron cargar las métricas</p>
-          <p className="text-on-surface-variant">{error || 'Verifica que el backend esté encendido.'}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setReloadKey((k) => k + 1)}
-          className="flex items-center gap-2 rounded-xl bg-primary px-6 py-3 font-medium text-white transition-colors hover:bg-primary-dark"
-        >
-          <RefreshCw className="h-4 w-4" /> Reintentar
-        </button>
-      </div>
-    )
+/**
+ * Métricas del panel calculadas en el cliente a partir de los datos que ya
+ * expone el DataContext (productos, usuarios, pedidos, ofertas). No dependemos
+ * de la forma del endpoint /dashboard/metrics, que en el backend desplegado
+ * devuelve un subconjunto variable de campos.
+ */
+function computeStats(
+  products: ReturnType<typeof useData>['products'],
+  users: ReturnType<typeof useData>['users'],
+  orders: Order[],
+  offers: ReturnType<typeof useData>['offers'],
+) {
+  const ordersByStatus: Record<OrderStatus, number> = {
+    pendiente: 0,
+    preparando: 0,
+    entregado: 0,
+    cancelado: 0,
+  }
+  let totalSales = 0
+  for (const o of orders) {
+    ordersByStatus[o.status] = (ordersByStatus[o.status] ?? 0) + 1
+    if (o.status === 'entregado') totalSales += o.total
+  }
+
+  // Ventas por fecha (últimos 14 días), excluyendo pedidos cancelados.
+  const dayTotals = new Map<string, { total: number; orders: number }>()
+  for (const o of orders) {
+    if (o.status === 'cancelado') continue
+    const key = o.date
+    const bucket = dayTotals.get(key) ?? { total: 0, orders: 0 }
+    bucket.total += o.total
+    bucket.orders += 1
+    dayTotals.set(key, bucket)
+  }
+  const salesByDate = lastFourteenDays().map((date) => ({
+    date,
+    total: dayTotals.get(date)?.total ?? 0,
+    orders: dayTotals.get(date)?.orders ?? 0,
+  }))
+
+  // Productos más vendidos (unidades), excluyendo pedidos cancelados.
+  const sold = new Map<string, { productId: string; name: string; totalSold: number }>()
+  for (const o of orders) {
+    if (o.status === 'cancelado') continue
+    for (const it of o.items) {
+      const entry = sold.get(it.productId) ?? { productId: it.productId, name: it.name, totalSold: 0 }
+      entry.totalSold += it.quantity
+      sold.set(it.productId, entry)
+    }
+  }
+  const topSellingProducts = [...sold.values()]
+    .sort((a, b) => b.totalSold - a.totalSold)
+    .slice(0, 5)
+
+  // Productos por vencer (0 a 3 días).
+  const expiringSoon = products
+    .filter((p) => {
+      if (!p.expiryDate) return false
+      const d = daysUntil(p.expiryDate)
+      return d >= 0 && d <= 3
+    })
+    .sort((a, b) => daysUntil(a.expiryDate) - daysUntil(b.expiryDate))
+    .slice(0, 8)
+
+  return {
+    totalSales,
+    totalOrders: orders.length,
+    ordersByStatus,
+    salesByDate,
+    topSellingProducts,
+    expiringSoon,
+    totalUsers: users.length,
+    totalClients: users.filter((u) => u.role === 'cliente').length,
+    totalProducts: products.length,
+    activeOffers: offers.filter((o) => o.active).length,
+  }
+}
+
+export default function AdminDashboard() {
+  const { products, users, orders, offers, error, refresh } = useData()
+  const [refreshing, setRefreshing] = useState(false)
+
+  const stats = useMemo(
+    () => computeStats(products, users, orders, offers),
+    [products, users, orders, offers],
+  )
+
+  const handleRefresh = () => {
+    setRefreshing(true)
+    refresh().finally(() => setRefreshing(false))
   }
 
   const maxOrders = Math.max(1, ...STATUS_META.map((s) => stats.ordersByStatus[s.key] ?? 0))
@@ -75,7 +133,7 @@ export default function AdminDashboard() {
 
   const cards = [
     { label: 'Ventas totales', value: formatPrice(stats.totalSales), hint: 'Pedidos entregados', icon: TrendingUp },
-    { label: 'Pedidos', value: String(stats.totalOrders), hint: `${stats.ordersByStatus.PENDING ?? 0} pendientes`, icon: ShoppingBag },
+    { label: 'Pedidos', value: String(stats.totalOrders), hint: `${stats.ordersByStatus.pendiente ?? 0} pendientes`, icon: ShoppingBag },
     { label: 'Usuarios registrados', value: String(stats.totalUsers), hint: `${stats.totalClients} clientes`, icon: Users },
     { label: 'Productos', value: String(stats.totalProducts), hint: `${stats.activeOffers} ofertas activas`, icon: Package },
   ]
@@ -89,12 +147,19 @@ export default function AdminDashboard() {
         </div>
         <button
           type="button"
-          onClick={() => setReloadKey((k) => k + 1)}
-          className="flex items-center gap-2 rounded-xl border border-outline bg-white px-3 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-variant"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="flex items-center gap-2 rounded-xl border border-outline bg-white px-3 py-2 text-sm font-medium text-on-surface-variant transition-colors hover:bg-surface-variant disabled:opacity-60"
         >
-          <RefreshCw className="h-4 w-4" /> Actualizar
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /> Actualizar
         </button>
       </div>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error">
+          <AlertTriangle className="h-4 w-4 shrink-0" /> {error}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -205,8 +270,7 @@ export default function AdminDashboard() {
           ) : (
             <ul className="space-y-1">
               {stats.expiringSoon.map((p) => {
-                const iso = p.expirationDate ? p.expirationDate.slice(0, 10) : ''
-                const d = daysUntil(iso)
+                const d = daysUntil(p.expiryDate)
                 return (
                   <li key={p.id} className="flex items-center justify-between text-sm">
                     <span className="text-on-surface">{p.name}</span>

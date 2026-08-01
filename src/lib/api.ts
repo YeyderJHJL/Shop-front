@@ -362,20 +362,20 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
 // Dashboard / métricas
 // --------------------------------------------------------------------------
 
+/**
+ * Forma REAL que devuelve el backend desplegado en /dashboard/metrics: un
+ * subconjunto reducido y variable (garantiza al menos totalRevenue y
+ * totalOrders). Por eso el panel de admin NO consume este endpoint: calcula
+ * todas sus métricas en el cliente a partir de productos / usuarios / pedidos /
+ * ofertas (ver AdminDashboard.tsx). Este wrapper queda disponible por si se
+ * necesita el resumen del servidor.
+ */
 export interface DashboardStats {
-  totalSales: number
   totalRevenue: number
   totalOrders: number
-  ordersByStatus: Record<string, number>
-  topSellingProducts: { productId: string; name: string; totalSold: number; revenue: number }[]
-  totalUsers: number
-  totalClients: number
-  totalAdmins: number
-  salesByDate: { date: string; total: number; orders: number }[]
-  totalProducts: number
-  activeOffers: number
-  lowStockProducts: { id: string; name: string; stock: number }[]
-  expiringSoon: { id: string; name: string; expirationDate: string | null }[]
+  lowStockProducts?: { id: string; name: string; stock: number }[]
+  highStockProducts?: { id: string; name: string; stock: number }[]
+  topSellingProducts?: { productId: string; name: string; totalSold: number }[]
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
